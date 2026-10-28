@@ -1,4 +1,17 @@
-export const setupSurrealdb = async (vpc: sst.aws.Vpc) => {
+import * as pulumi from "@pulumi/pulumi";
+import * as aws from "@pulumi/aws";
+import * as eks from "@pulumi/eks";
+import * as kubernetes from "@pulumi/kubernetes";
+
+export interface VpcConfig {
+	id: pulumi.Input<string>;
+	publicSubnets: pulumi.Input<pulumi.Input<string>[]>;
+	nodes?: {
+		securityGroup?: pulumi.Input<aws.ec2.SecurityGroup>;
+	};
+}
+
+export const setupSurrealdb = async (vpc: VpcConfig) => {
 	const cluster = new eks.Cluster("SurrealDBCluster", {
 		vpcId: vpc.id,
 		subnetIds: vpc.publicSubnets,
@@ -8,7 +21,7 @@ export const setupSurrealdb = async (vpc: sst.aws.Vpc) => {
 		maxSize: 1,
 		storageClasses: "gp3",
 		skipDefaultNodeGroup: false,
-		clusterSecurityGroup: vpc.nodes.securityGroup,
+		clusterSecurityGroup: vpc.nodes?.securityGroup,
 	});
 
 	const ebsCsiDriverAddon = new eks.Addon("aws-ebs-csi-driver", {
@@ -23,7 +36,6 @@ export const setupSurrealdb = async (vpc: sst.aws.Vpc) => {
 	const pdNodeGroup = new eks.ManagedNodeGroup("pd-nodegroup", {
 		cluster: cluster,
 		nodeGroupName: "pd-nodes",
-		// Recommended: ["c7g.xlarge"]
 		instanceTypes: ["t4g.small"],
 		amiType: "AL2023_ARM_64_STANDARD",
 		scalingConfig: {
@@ -41,7 +53,6 @@ export const setupSurrealdb = async (vpc: sst.aws.Vpc) => {
 	const tidbNodeGroup = new eks.ManagedNodeGroup("tidb-nodegroup", {
 		cluster: cluster,
 		nodeGroupName: "tidb-nodes",
-		// Recommended: ["c7g.4xlarge"]
 		instanceTypes: ["t4g.medium"],
 		amiType: "AL2023_ARM_64_STANDARD",
 		scalingConfig: {
@@ -59,7 +70,6 @@ export const setupSurrealdb = async (vpc: sst.aws.Vpc) => {
 	const tikvNodeGroup = new eks.ManagedNodeGroup("tikv-nodegroup", {
 		cluster: cluster,
 		nodeGroupName: "tikv-nodes",
-		// Recommended: ["m7g.4xlarge"]
 		instanceTypes: ["m7g.medium"],
 		amiType: "AL2023_ARM_64_STANDARD",
 		scalingConfig: {
@@ -74,7 +84,7 @@ export const setupSurrealdb = async (vpc: sst.aws.Vpc) => {
 	});
 
 	const provider = new kubernetes.Provider("eks-provider", {
-		kubeconfig: cluster.kubeconfig,
+		kubeconfig: cluster.kubeconfig.apply((k) => JSON.stringify(k)),
 	});
 
 	const tidbCrds = new kubernetes.yaml.ConfigFile(
@@ -256,6 +266,9 @@ export const setupSurrealdb = async (vpc: sst.aws.Vpc) => {
 	);
 
 	return {
+		cluster,
 		kubeconfig: cluster.kubeconfig,
+		tidbCluster,
+		surrealdb,
 	};
 };

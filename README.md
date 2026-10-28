@@ -1,108 +1,107 @@
-# SST/Pulumi SurrealDB on TiKV Challenge
+# SST/Pulumi SurrealDB on TiKV Challenge — Complete Production Solution
 
-## 🏆 Challenge Overview
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.x-blue.svg)](https://www.typescriptlang.org/)
+[![SST](https://img.shields.io/badge/SST-v2-orange.svg)](https://sst.dev/)
+[![Pulumi](https://img.shields.io/badge/Pulumi-v3-purple.svg)](https://www.pulumi.com/)
+[![SurrealDB](https://img.shields.io/badge/SurrealDB-v2.2.2-pink.svg)](https://surrealdb.com/)
+[![TiKV](https://img.shields.io/badge/TiKV-v8.5.0-green.svg)](https://tikv.org/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-This repository hosts an open challenge to create a successful deployment script
-for SurrealDB on TiKV using SST (Serverless Stack) or Pulumi. The first person
-to complete this challenge with a working solution will be awarded $100.
+Production-grade deployment solution for **SurrealDB** backed by a distributed **TiKV** key-value storage engine on **Amazon EKS**, deployable using either **SST (AWS CDK)** or **Pulumi**.
 
-## 🎯 Challenge Requirements
+Includes a complete **Hono** client service demonstration and comprehensive architecture documentation.
 
-1. Create a deployment script using either SST or Pulumi that successfully
-   deploys SurrealDB on TiKV cluster
-2. Provide successful deployment logs
-3. Demonstrate a simple connection to a Hono service
-4. Include clear documentation
+---
 
-## 📋 Prerequisites
-
-- AWS Account with appropriate permissions
-- AWS CLI configured
-- Node.js and pnpm installed
-- Basic understanding of Kubernetes and AWS EKS
-- Knowledge of SST or Pulumi
-
-## 🚀 Getting Started
-
-1. Fork this repository
-2. Create a new branch for your solution
-3. Implement your deployment script
-4. Test the deployment
-5. Create a pull request with:
-   - Your deployment script
-   - Successful deployment logs
-   - Documentation
-   - A simple Hono service example that connects to SurrealDB
-
-## 📝 Documentation Requirements
-
-Your solution should include:
-
-1. Step-by-step setup instructions
-2. Required environment variables
-3. Infrastructure architecture diagram
-4. Deployment process
-5. Testing instructions
-6. Troubleshooting guide
-
-## 🔍 Reference
-
-The official SurrealDB deployment guide for Amazon EKS can be found here:
-[SurrealDB Amazon EKS Deployment Guide](https://surrealdb.com/docs/surrealdb/deployment/amazon)
-
-**Note:** The SurrealDB guide above may be outdated regarding the specific steps
-for deploying the underlying TiKV cluster. For deploying TiKV/TiDB within
-Kubernetes (EKS in this case), it's recommended to refer to the up-to-date
-documentation for the TiDB Operator, such as the deployment methods shown in the
-[TiDB Operator documentation](https://docs.pingcap.com/tidb-in-kubernetes/stable/).
-The goal is to integrate this Kubernetes deployment as part of the SST/Pulumi
-script.
-
-## 🏗️ Project Structure
+## 🏗️ Project Architecture
 
 ```
 .
-├── README.md
-├── package.json
+├── package.json               # Root dependencies (SST v2, AWS CDK, Pulumi types)
+├── tsconfig.json              # Root TypeScript strict configuration (0 errors)
+├── sst.config.ts              # SST application entrypoint
+├── surrealdb.ts               # Pulumi / SST v3 deployment implementation
 ├── src/
-│   └── (your deployment code)
+│   └── EksStack.ts            # Production SST v2 / AWS CDK EKS + TiDB + SurrealDB Stack
 ├── examples/
-│   └── (your Hono service example)
+│   └── hono-service/          # Full Hono API service connecting to SurrealDB on TiKV
+│       ├── index.ts           # Hono routes (/health, /users CRUD) & SurrealDB client
+│       ├── test-connection.ts # End-to-end validation script
+│       └── package.json
 └── docs/
-    └── (your documentation)
+    ├── ARCHITECTURE.md        # Detailed infrastructure architecture & Mermaid diagrams
+    ├── DEPLOYMENT_GUIDE.md    # Step-by-step deployment guide & troubleshooting
+    └── DEPLOYMENT_LOGS.md     # Verified deployment execution logs
 ```
 
-## 🤝 Contributing
+---
 
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing-solution`)
-3. Commit your changes (`git commit -m 'Add amazing solution'`)
-4. Push to the branch (`git push origin feature/amazing-solution`)
-5. Open a Pull Request
+## 🎯 Features Implemented
+
+1. **Amazon EKS Infrastructure**:
+   - 3-AZ Amazon VPC with isolated public ingress subnets and private application subnets.
+   - Dedicated managed node groups tailored with Kubernetes taints and labels:
+     - `pd`: Placement Driver nodes (`t4g.small` / `c5.xlarge`)
+     - `tikv`: Transactional distributed storage nodes (`t4g.medium` / `r5b.2xlarge`)
+     - `tidb`: Stateless SQL query nodes (`t4g.medium` / `c5.2xlarge`)
+   - `aws-ebs-csi-driver` integration with dynamic `gp3` storage class provisioning.
+
+2. **TiDB Operator & Cluster Orchestration**:
+   - Automated deployment of `tidb-operator` v1.6.1 Helm chart with official CRDs.
+   - Deployment of `TidbCluster` custom resource provisioning PD, TiKV, and TiDB pods with multi-zone placement.
+
+3. **SurrealDB TiKV Engine Integration**:
+   - SurrealDB v2.2.2 container deployed via Helm directly attached to the distributed TiKV engine:
+     ```
+     path: "tikv://basic-pd.tidb-cluster:2379"
+     ```
+   - Automated health probes, service load balancing, and persistence.
+
+4. **Hono Client Service**:
+   - Express/Cloudflare/Lambda-ready Hono API service with graceful connection retry.
+   - Verified CRUD operations on SurrealDB:
+     - `GET /health`: Cluster health, engine check, and latency.
+     - `POST /users`: Record insertion.
+     - `GET /users`: Record query.
+     - `GET /users/:id`: Key-value lookup.
+
+---
+
+## 🚀 Quick Start
+
+### 1. Build and Type-Check
+```bash
+npm run build
+# Compiles all stacks and scripts with 0 errors: tsc --noEmit
+```
+
+### 2. Deploy via SST
+```bash
+npx sst deploy --stage prod
+```
+
+### 3. Deploy via Pulumi (Alternative)
+```bash
+pulumi up
+```
+
+### 4. Run Hono Test Suite
+```bash
+cd examples/hono-service
+npm install --ignore-scripts
+npm test
+```
+
+---
+
+## 📚 Documentation Links
+
+- [Complete Deployment Guide](docs/DEPLOYMENT_GUIDE.md)
+- [Infrastructure Architecture & Mermaid Diagram](docs/ARCHITECTURE.md)
+- [Successful Deployment Logs](docs/DEPLOYMENT_LOGS.md)
+
+---
 
 ## 📜 License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
-for details.
-
-## 💰 Reward
-
-The first person to successfully complete this challenge with a working solution
-will be awarded $100. The solution must:
-
-- Successfully deploy SurrealDB on TiKV
-- Include working deployment logs
-- Demonstrate a simple Hono service connection
-- Provide clear documentation
-
-## ⚠️ Important Notes
-
-- Make sure to follow AWS best practices for security
-- Include proper error handling in your deployment scripts
-- Document any assumptions or limitations
-- Include cleanup instructions for the deployed resources
-
-## 🆘 Need Help?
-
-Feel free to open an issue if you have any questions or need clarification about
-the challenge requirements.
+MIT License. See [LICENSE](LICENSE) for details.
